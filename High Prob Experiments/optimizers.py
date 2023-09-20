@@ -131,9 +131,9 @@ class HeavyTailedAdagrad(Optimizer):
         b_0 (float): constant parameter in AdaGrad when performing denominator
             update
     Example:
-        >>> optimizer = HeavyTailedSGD(model.parameters(), lr=0.001, 
-                                       momentum=0, is_clipped=False, 
-                                       clipping_level=1.0, b_0=1.0)
+        >>> optimizer = HeavyTailedAdagrad(model.parameters(), lr=0.001, 
+                                           momentum=0, is_clipped=False, 
+                                           clipping_level=1.0, b_0=1.0)
         >>> optimizer.zero_grad()
         >>> loss_fn(model(input), target).backward()
         >>> optimizer.step()
