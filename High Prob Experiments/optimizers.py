@@ -87,7 +87,7 @@ class HeavyTailedSGD(Optimizer):
                 d_p.add_(noise, p.data)
 
                 if is_clipped:
-                    torch.nn.utils.clip_grad_norm_(group['params'], clipping_level)
+                    torch.nn.utils.clip_grad_norm_(d_p, clipping_level)
 
                 if momentum != 0:
                     param_state = self.state[p]
@@ -131,9 +131,9 @@ class HeavyTailedAdagrad(Optimizer):
         b_0 (float): constant parameter in AdaGrad when performing denominator
             update
     Example:
-        >>> optimizer = HeavyTailedSGD(model.parameters(), lr=0.001, 
-                                       momentum=0, is_clipped=False, 
-                                       clipping_level=1.0, b_0=1.0)
+        >>> optimizer = HeavyTailedAdagrad(model.parameters(), lr=0.001, 
+                                           momentum=0, is_clipped=False, 
+                                           clipping_level=1.0, b_0=1.0)
         >>> optimizer.zero_grad()
         >>> loss_fn(model(input), target).backward()
         >>> optimizer.step()
@@ -195,7 +195,7 @@ class HeavyTailedAdagrad(Optimizer):
                 d_p = d_p.add_(noise, p.data)
 
                 if is_clipped:
-                    torch.nn.utils.clip_grad_norm_(group['params'], clipping_level)
+                    torch.nn.utils.clip_grad_norm_(d_p, clipping_level)
 
                 state['sum'].addcmul_(1, d_p, d_p)
                 std = state['sum'].sqrt().add_(1e-10)
