@@ -132,8 +132,8 @@ class HeavyTailedAdagrad(Optimizer):
             update
     Example:
         >>> optimizer = HeavyTailedAdagrad(model.parameters(), lr=0.001, 
-                                           momentum=0, is_clipped=False, 
-                                           clipping_level=1.0, b_0=1.0)
+                                           is_clipped=False, clipping_level=1.0,
+                                           b_0=1.0)
         >>> optimizer.zero_grad()
         >>> loss_fn(model(input), target).backward()
         >>> optimizer.step()
