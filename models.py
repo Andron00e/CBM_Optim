@@ -16,5 +16,10 @@ class DownloadCLIP:
 
 class DownloadCLIPhuggingface:
     def __init__(self,
-                 ):
+                 name: str,
+                 author: str,
+                 device):
+        super(DownloadCLIP).__init__()
+
+    def load(self):
         pass
