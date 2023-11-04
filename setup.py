@@ -5,7 +5,7 @@ from bokeh.io import output_notebook
 from sklearn.decomposition import PCA
 import bokeh.models as bm, bokeh.plotting as pl
 from sklearn.preprocessing import StandardScaler
-
+#TODO: rewrite this code in more efficient and newest way from my server's notebooks
 def remove_prefixes(strings):
     prefixes = ['a', 'an', 'the']
     result = []
@@ -18,10 +18,6 @@ def remove_prefixes(strings):
             result.append(string)
 
     return result
-
-with open("all_concepts.txt", "r") as f:
-    concepts = f.read().lower().split("\n")
-    concepts = remove_prefixes(concepts)
 
 def similarity(a: torch.Tensor, b: torch.Tensor):
     nom = a @ b.T

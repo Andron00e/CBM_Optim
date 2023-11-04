@@ -3,6 +3,44 @@ import open_clip
 from configs import *
 from sentence_transformers import SentenceTransformer
 
+class EnrichmentLayer:
+    """
+    Takes as input top concepts embeddings from Concept Bottleneck Layer and returns mode generated concept features
+    using either backbone language model or ConceptNet
+    Args:
+        in_features: tensor of shape [batch_size, dim]
+
+    Return:
+        out_features: tensor of shape [new_batch_size, dim]
+    """
+    def __init__(self, in_features: torch.Tensor, backbone):
+        self.in_features = in_features
+        self.backbone =
+        pass
+
+    def forward(self, x):
+        '''
+
+        '''
+        pass
+
+#TODO: write types for init arguments and test it
+class ConceptBottleneckModel(nn.Module):
+    def __init__(self, clip_mode, num_classes: int):
+        super().__init__()
+        self.clip_model =
+        self.cbl_1 =
+        self.enrich = EnrichmentLayer
+        self.cbl_2 =
+        num_concepts = self.cbl_2.shape[1] # change mb
+        self.head = nn.Linear(num_concepts, num_classes)
+
+    def forward(self, x):
+        x = self.enrich(self.cbl_1(self.clip_model(x)))
+        x = self.cbl_2(x)
+        x = self.head(x)
+        return x
+
 class DownloadCLIP:
     def __init__(self,
                  name: str,
@@ -16,7 +54,7 @@ class DownloadCLIP:
         clip, _, preprocess = open_clip.create_model_and_transforms(self.name, pretrained=self.author, device=self.device)
         return clip, preprocess
 
-class DownloadCLIPhuggingface:
+class DownloadCLIPfromHuggingface:
     def __init__(self,
                  name: str,
                  author: str,
