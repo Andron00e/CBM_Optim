@@ -1,4 +1,7 @@
 from configs import *
+import clip
+import open_clip
+from open_clip import tokenizer
 from PIL import Image
 from sklearn.manifold import TSNE
 from bokeh.io import output_notebook
@@ -61,7 +64,6 @@ def remove_prefixes(strings):
 
     return result
 
-
 def get_text_features(path_to_text: str, model_name="ViT-B-16", model_author="openai", device="cuda"):
     """
     Args:
@@ -88,6 +90,7 @@ def get_text_features(path_to_text: str, model_name="ViT-B-16", model_author="op
     text_features = torch.stack(text_encodings, dim=0)
 
     return text_features
+
 def similarity(a: torch.Tensor, b: torch.Tensor):
     nom = a @ b.T
     denom = a.norm(dim=-1) * b.norm(dim=-1)
@@ -170,10 +173,10 @@ def calculate_similarity_score(classes: dict, V_rows: torch.Tensor, T_matrix: to
 
     return scores
 
-def get_scores_dict(classes, V_matrix: torch.Tensor, T_matrix: torch.Tensor):
+def get_scores_dict(classes: dict, V_matrix: torch.Tensor, T_matrix: torch.Tensor):
     """
     Args:
-        classes:
+        classes: classes dict
         V_matrix:
         T_matrix:
     Return: scores_dict for drawing similarity scores
@@ -188,7 +191,7 @@ def get_scores_dict(classes, V_matrix: torch.Tensor, T_matrix: torch.Tensor):
 
     return scores_dict
 
-def draw_similarity_scores(scores_dict, true_class):
+def draw_similarity_scores(scores_dict: dict, true_class: str):
     """
     scores_dict: a nested dictionary with similarity scores
     true_class: the true image class for which scores should be plotted
@@ -209,15 +212,43 @@ def draw_similarity_scores(scores_dict, true_class):
     plt.ylabel("Total Similarity Score")
     plt.tight_layout()
     plt.show()
+    
+def calculate_similarity_score_accuracy_for_class(class_name: str, V_matrix: torch.Tensor, T_matrix: torch.Tensor, classes: dict):
+    """
+    Test the accuracy of the hypothesis
+    return: accuracy score for the class_name label by similarity method
+    """
+    slices = generate_slices_for_classes(classes, V_matrix)
+    slice_range = slices[class_name]
+    V_rows = V_matrix[slice_range]
+    sim_matrix = torch.zeros((V_rows.shape[0], T_matrix.shape[0]))
+    
+    correct, total = 0, 0
+    
+    for i, v_row in enumerate(V_rows):
+        for j, t_row in enumerate(T_matrix):
+            sim_matrix[i, j] = similarity(v_row, t_row).item()
+            
+    for idx in range(sim_matrix.shape[0]):
+        pred_idx = torch.argmax(sim_matrix[idx])
+        
+        if pred_idx == list(classes.values()).index(class_name):
+            correct += 1.0
+        total += 1.0
+        
+    return 100 * correct / total
+    
+def similarity_score_accuracy(classes: dict, V_matrix: torch.Tensor, T_matrix: torch.Tensor):
+    mean = np.mean([calculate_similarity_score_accuracy_for_class(class_name, V_matrix, T_matrix, classes) for class_name in classes.values()])
+    return "Similarity Score accuracy: {}%".format(mean)
 
 def calculate_max_score_accuracy_for_class(class_name: str, V_matrix: torch.Tensor, T_matrix: torch.Tensor, classes: dict):
-    #TODO: description
     """
     Args:
-        class_name:
-        V_matrix:
-        T_matrix:
-        classes:
+        class_name: name of class from classes dict
+        V_matrix: yeap
+        T_matrix: yeap
+        classes: classes dict
     Return:
     """
     slices = generate_slices_for_classes(classes, V_matrix)
@@ -238,6 +269,5 @@ def calculate_max_score_accuracy_for_class(class_name: str, V_matrix: torch.Tens
     return 100 * correct / total
 
 def max_score_accuracy(classes: dict, V_matrix: torch.Tensor, T_matrix: torch.Tensor):
-
-    mean = np.mean([calculate_max_score_accuracy_for_class(class_name, V_matrix, T_matrix) for class_name in classes.values()])
+    mean = np.mean([calculate_max_score_accuracy_for_class(class_name, V_matrix, T_matrix, classes) for class_name in classes.values()])
     return "Max Score accuracy: {}%".format(mean)

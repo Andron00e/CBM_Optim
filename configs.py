@@ -1,6 +1,5 @@
 import os
 import math
-import tqdm
 import torch
 import random
 import requests
@@ -9,6 +8,7 @@ import numpy as np
 import pandas as pd
 import seaborn as sns
 import torch.nn as nn
+from tqdm import tqdm
 import torch.nn.functional as F
 import matplotlib.pyplot as plt
 import torchvision.transforms as transforms
@@ -36,3 +36,5 @@ def set_device(device_no: int):
     else:
         print("No GPU available, using the CPU instead.")
         device = torch.device("cpu")
+        
+    return device
