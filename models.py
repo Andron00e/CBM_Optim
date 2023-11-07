@@ -1,5 +1,6 @@
 import clip
 import open_clip
+from transformers import CLIPProcessor, CLIPModel
 from configs import *
 from sentence_transformers import SentenceTransformer
 
@@ -60,9 +61,14 @@ class DownloadCLIPfromHuggingface:
                  author: str,
                  device):
         super(DownloadCLIP).__init__()
+        self.name = name
+        self.author = author
+        self.device = device
 
     def load(self):
-        pass
+        model = CLIPModel.from_pretrained("{}/{}".format(self.author, self.name), device=self.device)
+        processor = CLIPProcessor.from_pretrained("{}/{}".format(self.author, self.name), device=self.device)
+        return model, processor
 
 class ConceptNetFiltering:
     """

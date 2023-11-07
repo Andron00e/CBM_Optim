@@ -20,6 +20,8 @@ class Constants:
     seed = 42
     batch_size = 32
     lr = 1e-3
+    default_author = "openai"
+    default_name_hf = "clip-vit-base-patch32"
 
 
 def set_seed(seed):
