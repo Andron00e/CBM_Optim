@@ -79,7 +79,8 @@ class ConceptNetFiltering:
         self.class_sim_cutoff = 0.85
         self.other_sim_cutoff = 0.9
 
-    def get_init_conceptnet(self, parent_list, limit=200,
+    @staticmethod
+    def get_init_conceptnet(parent_list, limit=200,
                             relations=["HasA", "IsA", "PartOf", "HasProperty", "MadeOf", "AtLocation"]):
         concepts = set()
 
@@ -104,7 +105,8 @@ class ConceptNetFiltering:
                             concepts.add(dicti['end']['label'])
         return concepts
 
-    def _clip_dot_prods(self, list1, list2, device="cuda", clip_name="ViT-B/16", batch_size=500):
+    @staticmethod
+    def _clip_dot_prods(list1, list2, device="cuda", clip_name="ViT-B/16", batch_size=500):
         "Returns: numpy array with dot products"
         clip_model, _ = clip.load(clip_name, device=device)
         text1 = clip.tokenize(list1).to(device)
@@ -127,10 +129,11 @@ class ConceptNetFiltering:
         dot_prods = features1 @ features2.T
         return dot_prods.cpu().numpy()
 
-    def filter_too_similar_to_cls(self, parent_list, sim_cutoff, device="cuda", print_prob=0):
+    @staticmethod
+    def filter_too_similar_to_cls(concepts, parent_list, sim_cutoff, device="cuda", print_prob=0):
         # first check simple text matches
-        print(len(self.remove_too_long))
-        concepts = list(self.remove_too_long)
+        print(len(concepts))
+        concepts = list(concepts)
         concepts = sorted(concepts)
 
         for cls in parent_list:
@@ -155,7 +158,7 @@ class ConceptNetFiltering:
         class_features_m = mpnet_model.encode(parent_list)
         concept_features_m = mpnet_model.encode(concepts)
         dot_prods_m = class_features_m @ concept_features_m.T
-        dot_prods_c = self._clip_dot_prods(parent_list, concepts)
+        dot_prods_c = ConceptNetFiltering._clip_dot_prods(parent_list, concepts)
         # weighted since mpnet has higher variance
         dot_prods = (dot_prods_m + 3 * dot_prods_c) / 4
 
@@ -179,14 +182,14 @@ class ConceptNetFiltering:
         print(len(concepts))
         return concepts
 
-    def filter_too_similar(self, sim_cutoff, device="cuda", print_prob=0):
+    @staticmethod
+    def filter_too_similar(concepts, sim_cutoff, device="cuda", print_prob=0):
 
-        concepts = self.filter_too_similar_to_cls
         mpnet_model = SentenceTransformer('all-mpnet-base-v2')
         concept_features = mpnet_model.encode(concepts)
 
         dot_prods_m = concept_features @ concept_features.T
-        dot_prods_c = self._clip_dot_prods(concepts, concepts)
+        dot_prods_c = ConceptNetFiltering._clip_dot_prods(concepts, concepts)
 
         dot_prods = (dot_prods_m + 3 * dot_prods_c) / 4
 
@@ -215,9 +218,9 @@ class ConceptNetFiltering:
         print(len(concepts))
         return concepts
 
-    def remove_too_long(self, max_len, print_prob=0):
+    @staticmethod
+    def remove_too_long(concepts, max_len, print_prob=0):
 
-        concepts = self.get_init_conceptnet
         new_concepts = []
         for concept in concepts:
             if len(concept) <= max_len:

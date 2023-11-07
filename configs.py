@@ -27,3 +27,12 @@ def set_seed(seed):
     np.random.seed(seed)
     torch.manual_seed(seed)
     torch.cuda.manual_seed_all(seed)
+
+def set_device(device_no: int):
+    if torch.cuda.is_available():
+        device = torch.device("cuda")
+        print("There are %d GPU(s) available." % torch.cuda.device_count())
+        print("We will use the GPU:", torch.cuda.get_device_name(device_no))
+    else:
+        print("No GPU available, using the CPU instead.")
+        device = torch.device("cpu")

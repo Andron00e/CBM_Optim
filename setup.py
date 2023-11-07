@@ -71,9 +71,3 @@ def draw_similarity_scores(scores_dict, true_class):
     plt.ylabel("Total Similarity Score")
     plt.tight_layout()
     plt.show()
-
-class EmbeddingExperiments:
-    def __init__(self,
-
-                 ):
-        pass
