@@ -1,5 +1,6 @@
 import clip
 import open_clip
+import transformers
 from transformers import CLIPProcessor, CLIPModel
 from configs import *
 from sentence_transformers import SentenceTransformer
@@ -42,33 +43,8 @@ class ConceptBottleneckModel(nn.Module):
         x = self.head(x)
         return x
 
-class DownloadCLIP:
-    def __init__(self,
-                 name: str,
-                 author: str,
-                 device):
-        self.name = name
-        self.author = author
-        self.device = device
 
-    def load(self):
-        clip, _, preprocess = open_clip.create_model_and_transforms(self.name, pretrained=self.author, device=self.device)
-        return clip, preprocess
 
-class DownloadCLIPfromHuggingface:
-    def __init__(self,
-                 name: str,
-                 author: str,
-                 device):
-        super(DownloadCLIP).__init__()
-        self.name = name
-        self.author = author
-        self.device = device
-
-    def load(self):
-        model = CLIPModel.from_pretrained("{}/{}".format(self.author, self.name), device=self.device)
-        processor = CLIPProcessor.from_pretrained("{}/{}".format(self.author, self.name), device=self.device)
-        return model, processor
 
 class ConceptNetFiltering:
     """
@@ -245,3 +221,20 @@ class ConceptNetFiltering:
         concepts = self.filter_too_similar(concepts, other_sim_cutoff=self.other_sim_cutoff, print_prob=self.print_prob)
 
         return concepts
+
+class TuningCLIPhead(nn.Module):
+    """
+    Class which introduces CLIP model with classification head at the top of it.
+
+    """
+    def __init__(self, model_name: str="openai/clip-vit-base-patch32", concepts: list=concepts, classes: dict=classes):
+        super().__init__()
+        self.clip = transformers.CLIPModel.from_pretrained(model_name)
+        self.processor = transformers.CLIPProcessor.from_pretrained(model_name)
+        for param in self.clip.parameters():
+            param.requires_grad=False
+        self.head = nn.Linear(len(concepts), len(classes), bias=False)
+
+    def forward(self, **batch):
+        out = self.clip(**batch).logits_per_image
+        return self.head(out)
