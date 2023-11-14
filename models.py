@@ -227,7 +227,7 @@ class TuningCLIPhead(nn.Module):
     Class which introduces CLIP model with classification head at the top of it.
 
     """
-    def __init__(self, model_name: str="openai/clip-vit-base-patch32", concepts: list=concepts, classes: dict=classes):
+    def __init__(self, concepts: list, classes: dict, model_name: str="openai/clip-vit-base-patch32"):
         super().__init__()
         self.clip = transformers.CLIPModel.from_pretrained(model_name)
         self.processor = transformers.CLIPProcessor.from_pretrained(model_name)
