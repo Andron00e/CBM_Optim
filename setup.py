@@ -52,6 +52,7 @@ def get_image_features(path_to_im: str, classes: dict, N: int, model_name="ViT-B
 
     return image_features
 
+
 def remove_prefixes(strings):
     prefixes = ['a', 'an', 'the']
     result = []
@@ -63,6 +64,7 @@ def remove_prefixes(strings):
             result.append(string)
 
     return result
+
 
 def get_text_features(path_to_text: str, model_name="ViT-B-16", model_author="openai", device="cuda"):
     """
@@ -91,15 +93,18 @@ def get_text_features(path_to_text: str, model_name="ViT-B-16", model_author="op
 
     return text_features
 
+
 def similarity(a: torch.Tensor, b: torch.Tensor):
     nom = a @ b.T
     denom = a.norm(dim=-1) * b.norm(dim=-1)
     return nom / denom
 
+
 def cubed_similarity(a: torch.Tensor, b: torch.Tensor):
-    nom = a**3 @ (b**3).T
-    denom = (a**3).norm(dim=-1) * (b**3).norm(dim=-1)
+    nom = a ** 3 @ (b ** 3).T
+    denom = (a ** 3).norm(dim=-1) * (b ** 3).norm(dim=-1)
     return nom / denom
+
 
 def get_dot_prods_matrix(image_features: torch.Tensor, text_features: torch.Tensor, eps=1e-8):
     """
@@ -119,6 +124,7 @@ def get_dot_prods_matrix(image_features: torch.Tensor, text_features: torch.Tens
     matrix /= row_sum + eps
     return matrix
 
+
 def draw_vectors(x, y, radius=10, alpha=0.25, color='blue',
                  width=600, height=400, show=True, **kwargs):
     """ draws an interactive plot for data points with auxiliary info on hover """
@@ -131,6 +137,7 @@ def draw_vectors(x, y, radius=10, alpha=0.25, color='blue',
     fig.add_tools(bm.HoverTool(tooltips=[(key, "@" + key) for key in kwargs.keys()]))
     if show: pl.show(fig)
     return fig
+
 
 def generate_slices_for_classes(classes: dict, V_matrix: torch.Tensor):
     """
@@ -147,7 +154,8 @@ def generate_slices_for_classes(classes: dict, V_matrix: torch.Tensor):
 
     return slices
 
-def calculate_similarity_score(classes: dict, V_rows: torch.Tensor, T_matrix: torch.Tensor, sim: str="sim"):
+
+def calculate_similarity_score(classes: dict, V_rows: torch.Tensor, T_matrix: torch.Tensor, sim: str = "sim"):
     """
     V_rows: a rows of V_matrix for the same class
     T_matrix: classes-concepts matrix
@@ -173,6 +181,7 @@ def calculate_similarity_score(classes: dict, V_rows: torch.Tensor, T_matrix: to
 
     return scores
 
+
 def get_scores_dict(classes: dict, V_matrix: torch.Tensor, T_matrix: torch.Tensor):
     """
     Args:
@@ -190,6 +199,7 @@ def get_scores_dict(classes: dict, V_matrix: torch.Tensor, T_matrix: torch.Tenso
         scores_dict[class_name] = scores
 
     return scores_dict
+
 
 def draw_similarity_scores(scores_dict: dict, true_class: str):
     """
@@ -212,8 +222,10 @@ def draw_similarity_scores(scores_dict: dict, true_class: str):
     plt.ylabel("Total Similarity Score")
     plt.tight_layout()
     plt.show()
-    
-def calculate_similarity_score_accuracy_for_class(class_name: str, V_matrix: torch.Tensor, T_matrix: torch.Tensor, classes: dict):
+
+
+def calculate_similarity_score_accuracy_for_class(class_name: str, V_matrix: torch.Tensor, T_matrix: torch.Tensor,
+                                                  classes: dict):
     """
     Test the accuracy of the hypothesis
     return: accuracy score for the class_name label by similarity method
@@ -222,27 +234,32 @@ def calculate_similarity_score_accuracy_for_class(class_name: str, V_matrix: tor
     slice_range = slices[class_name]
     V_rows = V_matrix[slice_range]
     sim_matrix = torch.zeros((V_rows.shape[0], T_matrix.shape[0]))
-    
+
     correct, total = 0, 0
-    
+
     for i, v_row in enumerate(V_rows):
         for j, t_row in enumerate(T_matrix):
             sim_matrix[i, j] = similarity(v_row, t_row).item()
-            
+
     for idx in range(sim_matrix.shape[0]):
         pred_idx = torch.argmax(sim_matrix[idx])
-        
+
         if pred_idx == list(classes.values()).index(class_name):
             correct += 1.0
         total += 1.0
-        
+
     return 100 * correct / total
-    
+
+
 def similarity_score_accuracy(classes: dict, V_matrix: torch.Tensor, T_matrix: torch.Tensor):
-    mean = np.mean([calculate_similarity_score_accuracy_for_class(class_name, V_matrix, T_matrix, classes) for class_name in classes.values()])
+    mean = np.mean(
+        [calculate_similarity_score_accuracy_for_class(class_name, V_matrix, T_matrix, classes) for class_name in
+         classes.values()])
     return "Similarity Score accuracy: {}%".format(mean)
 
-def calculate_max_score_accuracy_for_class(class_name: str, V_matrix: torch.Tensor, T_matrix: torch.Tensor, classes: dict):
+
+def calculate_max_score_accuracy_for_class(class_name: str, V_matrix: torch.Tensor, T_matrix: torch.Tensor,
+                                           classes: dict):
     """
     Args:
         class_name: name of class from classes dict
@@ -268,6 +285,8 @@ def calculate_max_score_accuracy_for_class(class_name: str, V_matrix: torch.Tens
 
     return 100 * correct / total
 
+
 def max_score_accuracy(classes: dict, V_matrix: torch.Tensor, T_matrix: torch.Tensor):
-    mean = np.mean([calculate_max_score_accuracy_for_class(class_name, V_matrix, T_matrix, classes) for class_name in classes.values()])
+    mean = np.mean([calculate_max_score_accuracy_for_class(class_name, V_matrix, T_matrix, classes) for class_name in
+                    classes.values()])
     return "Max Score accuracy: {}%".format(mean)
