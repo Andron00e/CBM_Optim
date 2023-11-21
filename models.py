@@ -51,6 +51,12 @@ class ConceptNetFiltering:
     Class which provides concept generation via ConceptNet api
     Args:
          parent_list: list based on which  set of concepts is created
+    Return: list of generated concepts from initial parent_list
+    Usage:
+        !pip install openai-clip
+        import clip
+        concept_filtering = ConceptNetFiltering(parent_list)
+        concept_filtering.filter()
     """
     def __init__(self, parent_list: list):
         self.parent_list = parent_list
@@ -213,12 +219,11 @@ class ConceptNetFiltering:
         print(len(concepts), len(new_concepts))
         return new_concepts
 
-    def create(self):
-
-        concepts = self.get_init_conceptnet(parent_list=self.parent_list, limit=self.limit, relations=self.relations)
-        concepts = self.remove_too_long(concepts, max_len=self.max_len, print_prob=self.print_prob)
-        concepts = self.filter_too_similar_to_cls(concepts, self.parent_list, self.class_sim_cutoff, print_prob=self.print_prob)
-        concepts = self.filter_too_similar(concepts, other_sim_cutoff=self.other_sim_cutoff, print_prob=self.print_prob)
+    def filter(self):
+        concepts = ConceptNetFiltering.get_init_conceptnet(parent_list=self.parent_list, limit=self.limit, relations=self.relations)
+        concepts = ConceptNetFiltering.remove_too_long(concepts, max_len=self.max_len, print_prob=self.print_prob)
+        concepts = ConceptNetFiltering.filter_too_similar_to_cls(concepts, self.parent_list, self.class_sim_cutoff, print_prob=self.print_prob)
+        concepts = ConceptNetFiltering.filter_too_similar(concepts, other_sim_cutoff=self.other_sim_cutoff, print_prob=self.print_prob)
 
         return concepts
 
