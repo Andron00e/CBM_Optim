@@ -223,7 +223,7 @@ class ConceptNetFiltering:
         concepts = ConceptNetFiltering.get_init_conceptnet(parent_list=self.parent_list, limit=self.limit, relations=self.relations)
         concepts = ConceptNetFiltering.remove_too_long(concepts, max_len=self.max_len, print_prob=self.print_prob)
         concepts = ConceptNetFiltering.filter_too_similar_to_cls(concepts, self.parent_list, self.class_sim_cutoff, print_prob=self.print_prob)
-        concepts = ConceptNetFiltering.filter_too_similar(concepts, other_sim_cutoff=self.other_sim_cutoff, print_prob=self.print_prob)
+        concepts = ConceptNetFiltering.filter_too_similar(concepts, sim_cutoff=self.other_sim_cutoff, print_prob=self.print_prob)
 
         return concepts
 
