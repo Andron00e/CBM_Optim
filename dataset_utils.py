@@ -1,7 +1,8 @@
 from configs import *
 from transformers import CLIPModel, CLIPProcessor, AutoTokenizer
 
-class CLIPDataset():
+
+class CLIPDataset:
     """
     Class which creates dataset with joint labels and images itself.
     It is convenient to use CLIPDataset with HuggingFace.
@@ -16,6 +17,7 @@ class CLIPDataset():
             "labels": dataset.label
          })
     """
+
     def __init__(self, list_image_path, list_txt):
         """
         Args:
@@ -37,12 +39,15 @@ class CLIPDataset():
 
 def collate_fn(batch):
     return {
-        'pixel_values': torch.stack([x['pixel_values'] for x in batch]),
-        'labels': torch.tensor([x['labels'] for x in batch])
+        "pixel_values": torch.stack([x["pixel_values"] for x in batch]),
+        "labels": torch.tensor([x["labels"] for x in batch]),
     }
 
-def process_data(example_batch, model_name: str="openai/clip-vit-base-patch32"):
+
+def process_data(example_batch, model_name: str = "openai/clip-vit-base-patch32"):
     processor = CLIPProcessor.from_pretrained(model_name)
-    inputs = processor.image_processor([x for x in example_batch['image']], return_tensors="pt")
-    inputs['labels'] = example_batch['labels']
+    inputs = processor.image_processor(
+        [x for x in example_batch["image"]], return_tensors="pt"
+    )
+    inputs["labels"] = example_batch["labels"]
     return inputs

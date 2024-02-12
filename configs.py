@@ -17,7 +17,6 @@ from torch.utils.data import Dataset, DataLoader
 
 
 class Constants:
-
     seed = 42
     batch_size = 32
     lr = 1e-3
@@ -31,6 +30,7 @@ def set_seed(seed):
     torch.manual_seed(seed)
     torch.cuda.manual_seed_all(seed)
 
+
 def set_device(device_no: int):
     if torch.cuda.is_available():
         device = torch.device("cuda")
@@ -39,5 +39,5 @@ def set_device(device_no: int):
     else:
         print("No GPU available, using the CPU instead.")
         device = torch.device("cpu")
-        
+
     return device
