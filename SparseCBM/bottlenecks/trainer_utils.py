@@ -3,6 +3,7 @@
 # add initialize_history function before the class
 # add configure_optimizers and bs_muls function
 # add .test method and test_loader if not None
+# test evaluate load instead of load_metric from datasets
 # rename preprocessed loader to loader
 # draw norm hists and compute norm diffs functions to be released
 
