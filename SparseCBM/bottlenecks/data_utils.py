@@ -1,7 +1,8 @@
 import sys
 from configs import *
 import transformers
-
+from datasets import load_dataset
+from datasets import DatasetDict
 
 def collate_fn(batch):
     return {
@@ -50,10 +51,8 @@ def prepared_dataloaders(
     test_size: int = 0.2,
     prep_loaders="all",
     batch_size: int = 32,
+    clip_model: str = "openai/clip-vit-base-patch32",
 ):
-    from datasets import load_dataset
-    from datasets import DatasetDict
-
     dataset = load_dataset(hf_link)
     dataset = dataset["train"].train_test_split(test_size=0.2)
     val_test = dataset["test"].train_test_split(test_size=0.5)
@@ -88,20 +87,20 @@ def prepared_dataloaders(
     )
 
     if prep_loaders == "all":
-        train_loader_preprocessed = preprocess_loader(train_loader, concepts)
-        val_loader_preprocessed = preprocess_loader(val_loader, concepts)
-        test_loader_preprocessed = preprocess_loader(test_loader, concepts)
+        train_loader_preprocessed = preprocess_loader(train_loader, concepts, clip_model=clip_model)
+        val_loader_preprocessed = preprocess_loader(val_loader, concepts, clip_model=clip_model)
+        test_loader_preprocessed = preprocess_loader(test_loader, concepts, clip_model=clip_model)
         return (
             train_loader_preprocessed,
             val_loader_preprocessed,
             test_loader_preprocessed,
         )
     elif prep_loaders == "train":
-        train_loader_preprocessed = preprocess_loader(train_loader, concepts)
+        train_loader_preprocessed = preprocess_loader(train_loader, concepts, clip_model=clip_model)
         return train_loader_preprocessed
     elif prep_loaders == "val":
-        val_loader_preprocessed = preprocess_loader(val_loader, concepts)
+        val_loader_preprocessed = preprocess_loader(val_loader, concepts, clip_model=clip_model)
         return val_loader_preprocessed
     elif prep_loaders == "test":
-        test_loader_preprocessed = preprocess_loader(test_loader, concepts)
+        test_loader_preprocessed = preprocess_loader(test_loader, concepts, clip_model=clip_model)
         return test_loader_preprocessed
