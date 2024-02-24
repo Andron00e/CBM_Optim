@@ -24,10 +24,10 @@ def remove_prefixes(strings):
     return result
 
 
-def preprocess_loader(loader, concepts: list):
+def preprocess_loader(loader, concepts: list, clip_name: str="openai/clip-vit-base-patch32"):
     preprocessed_batches = []
     processor = transformers.CLIPProcessor.from_pretrained(
-        "openai/clip-vit-base-patch32"
+        clip_name
     )
     for batch in tqdm(loader):
         preprocessed_batch = preprocess_batch(batch, processor, concepts)
@@ -91,6 +91,11 @@ def prepared_dataloaders(
         train_loader_preprocessed = preprocess_loader(train_loader, concepts)
         val_loader_preprocessed = preprocess_loader(val_loader, concepts)
         test_loader_preprocessed = preprocess_loader(test_loader, concepts)
+        return (
+            train_loader_preprocessed,
+            val_loader_preprocessed,
+            test_loader_preprocessed,
+        )
     elif prep_loaders == "train":
         train_loader_preprocessed = preprocess_loader(train_loader, concepts)
         return train_loader_preprocessed
@@ -100,5 +105,3 @@ def prepared_dataloaders(
     elif prep_loaders == "test":
         test_loader_preprocessed = preprocess_loader(test_loader, concepts)
         return test_loader_preprocessed
-
-    # return train_loader_preprocessed, val_loader_preprocessed, test_loader_preprocessed
