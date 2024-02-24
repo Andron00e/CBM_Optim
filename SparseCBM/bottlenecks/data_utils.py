@@ -4,6 +4,7 @@ import transformers
 from datasets import load_dataset
 from datasets import DatasetDict
 
+
 def collate_fn(batch):
     return {
         "image": [x["image"] for x in batch],
@@ -25,11 +26,11 @@ def remove_prefixes(strings):
     return result
 
 
-def preprocess_loader(loader, concepts: list, clip_name: str="openai/clip-vit-base-patch32"):
+def preprocess_loader(
+    loader, concepts: list, clip_name: str = "openai/clip-vit-base-patch32"
+):
     preprocessed_batches = []
-    processor = transformers.CLIPProcessor.from_pretrained(
-        clip_name
-    )
+    processor = transformers.CLIPProcessor.from_pretrained(clip_name)
     for batch in tqdm(loader):
         preprocessed_batch = preprocess_batch(batch, processor, concepts)
         preprocessed_batches.append(preprocessed_batch)
@@ -87,20 +88,32 @@ def prepared_dataloaders(
     )
 
     if prep_loaders == "all":
-        train_loader_preprocessed = preprocess_loader(train_loader, concepts, clip_model=clip_model)
-        val_loader_preprocessed = preprocess_loader(val_loader, concepts, clip_model=clip_model)
-        test_loader_preprocessed = preprocess_loader(test_loader, concepts, clip_model=clip_model)
+        train_loader_preprocessed = preprocess_loader(
+            train_loader, concepts, clip_model=clip_model
+        )
+        val_loader_preprocessed = preprocess_loader(
+            val_loader, concepts, clip_model=clip_model
+        )
+        test_loader_preprocessed = preprocess_loader(
+            test_loader, concepts, clip_model=clip_model
+        )
         return (
             train_loader_preprocessed,
             val_loader_preprocessed,
             test_loader_preprocessed,
         )
     elif prep_loaders == "train":
-        train_loader_preprocessed = preprocess_loader(train_loader, concepts, clip_model=clip_model)
+        train_loader_preprocessed = preprocess_loader(
+            train_loader, concepts, clip_model=clip_model
+        )
         return train_loader_preprocessed
     elif prep_loaders == "val":
-        val_loader_preprocessed = preprocess_loader(val_loader, concepts, clip_model=clip_model)
+        val_loader_preprocessed = preprocess_loader(
+            val_loader, concepts, clip_model=clip_model
+        )
         return val_loader_preprocessed
     elif prep_loaders == "test":
-        test_loader_preprocessed = preprocess_loader(test_loader, concepts, clip_model=clip_model)
+        test_loader_preprocessed = preprocess_loader(
+            test_loader, concepts, clip_model=clip_model
+        )
         return test_loader_preprocessed
