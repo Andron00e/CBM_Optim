@@ -24,7 +24,6 @@ class color:
 def plot_training(
     model, optimizer, n_epochs, lr, train_loader, test_loader, log_interval
 ):
-
     train_losses = []
     train_counter = []
     test_losses = []
@@ -91,7 +90,6 @@ def plot_averaged_training(
     log_interval,
     number_of_iterations,
 ):
-
     train_losses_avg = []
     test_losses_avg = []
 
@@ -102,7 +100,6 @@ def plot_averaged_training(
                 torch.nn.init.zeros_(m.bias)
 
     for i in range(number_of_iterations):
-
         print(color.BOLD + "Training iteration: " + color.END, i + 1)
         model.apply(weights_init)
 

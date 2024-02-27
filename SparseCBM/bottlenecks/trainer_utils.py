@@ -1,10 +1,15 @@
-# add configure_optimizers and bs_muls function
 # draw norm hists and compute norm diffs functions to be released
+# make tau in GumbelSoftmaxContrastiveLoss trainable
+# check is savefig works correctly
+# add functions that plot metrics and losses after training
+# add functions that draw an interpretability bars with conf matrices
 
 import os
 import time
 import warnings
 from graph_plot_tools import *
+from cbm import *
+from cbm import BaseCBModel
 from utils import *
 from configs import *
 from evaluate import load
@@ -12,14 +17,15 @@ from IPython import display
 from matplotlib import animation
 
 
-def init_history(run_name, nets, opts, opt_names, bs_muls):
+def init_history(run_name, nets, opts, displayed_names, bs_muls):
     hist = []
-    for net, optimizer, opt_name, bs_mul in zip(nets, opts, opt_names, bs_muls):
-        net.to(device)
+    for net, optimizer, displayed_name, bs_mul in zip(
+        nets, opts, displayed_names, bs_muls
+    ):
         hist.append(
             {
                 "run_name": run_name,
-                "name": opt_name,
+                "name": displayed_name,
                 "bs_mul": bs_mul,
                 "train_loss": [],
                 "train_x": [],
@@ -48,27 +54,113 @@ def init_history(run_name, nets, opts, opt_names, bs_muls):
                 "batch_end": True,
             }
         )
-        return hist
+    return hist
+
+
+class CBMConfig:
+    def __init__(
+        self,
+        num_nets: int,
+        num_concepts: int,
+        num_classes: int,
+        run_name: str,
+        backbones: list,
+        displayed_names: list,
+        training_methods: list,
+        optimizers: list,
+        lrs: list,
+        cbl_lrs: list,
+        train_backbones: list,
+    ):
+        self.num_nets = num_nets
+        self.num_concepts = num_concepts
+        self.num_classes = num_classes
+        self.run_name = run_name
+        self.backbones = backbones
+        self.displayed_names = displayed_names
+        self.training_methods = training_methods
+        self.optimizers = optimizers
+        self.lrs = lrs
+        self.cbl_lrs = cbl_lrs
+        self.train_backbones = train_backbones
+        self.bs_muls = [1] * self.num_nets
+        assert (
+            self.num_nets
+            == len(self.backbones)
+            == len(self.training_methods)
+            == len(self.optimizers)
+            == len(self.lrs)
+            == len(self.cbl_lrs)
+            == len(self.train_backbones)
+            == len(self.bs_muls)
+        ), "These lists must be of the same length."
+        self.optimizers_dict = {
+            "Adam": torch.optim.Adam,
+            "AdamW": torch.optim.AdamW,
+            "SGD": torch.optim.SGD,
+        }
+
+    def _create_models_and_optimizers(self):
+        torch.cuda.empty_cache()
+        nets, opts = [], []
+        for _ in range(self.num_nets):
+            for backbone_name, train_backbone, opt_name, lr, cbl_lr in zip(
+                self.backbones,
+                self.train_backbones,
+                self.optimizers,
+                self.lrs,
+                self.cbl_lrs,
+            ):
+                nets.append(
+                    BaseCBModel(
+                        num_concepts=self.num_concepts,
+                        num_classes=self.num_classes,
+                        backbone_name=backbone_name,
+                        train_backbone=train_backbone,
+                    )
+                )
+                nets[-1].zero_grad()
+                nets[-1].train()
+                opts.append(
+                    (
+                        self.optimizers_dict[opt_name](
+                            nets[-1].cbl.parameters(), lr=cbl_lr
+                        ),
+                        self.optimizers_dict[opt_name](
+                            nets[-1].head.parameters(), lr=lr
+                        ),
+                    )
+                )
+                # backbone won't be trained yet, because we connect optimizer only to the head.parameters()
+        return nets, opts
+
+    def unpack(self):
+        nets, opts = self._create_models_and_optimizers()
+        hist = init_history(
+            self.run_name, nets, opts, self.displayed_names, self.bs_muls
+        )
+        return nets, opts, hist, self.run_name, self.training_methods
 
 
 class BottleneckTrainer:
     def __init__(
         self,
-        nets,
-        opts,
-        hist,
-        device,
+        config,
         train_loader,
         val_loader,
         test_loader,
-        training_method,
-        run_name,
         num_epochs=10,
+        device=None,
         lr_decay=1.0,
         batch_mul_step_count=500,
         norm_diffs_step_count=500,
         val_step_count=500,
+        gumbel_hard=False,
+        gumbel_tau=1.0,
+        l1_lambda=1e-3,
+        is_cubed=False,
     ):
+        nets, opts, hist, run_name, training_methods = config.unpack()
         self.nets = nets
         self.opts = opts
         self.hist = hist
@@ -77,10 +169,11 @@ class BottleneckTrainer:
         self.val_loader = val_loader
         self.test_loader = test_loader
         self.criterion = torch.nn.CrossEntropyLoss()
-        self.training_method = training_method
+        self.training_methods = training_methods
         self.criterion_gumbel = criterion_gumbel
-        self.criterion_cbl = criterion_cbl
+        self.criterion_contrastive = criterion_contrastive
         self.criterion_l1 = criterion_l1
+        self.criterion_similarity = criterion_similarity
         self.precision_metric = load("precision")
         self.recall_metric = load("recall")
         self.f1_metric = load("f1")
@@ -91,6 +184,10 @@ class BottleneckTrainer:
         self.norm_diffs_step_count = norm_diffs_step_count
         self.val_step_count = val_step_count
         self.calc_norm_diffs = False
+        self.gumbel_hard = gumbel_hard
+        self.gumbel_tau = gumbel_tau
+        self.l1_lambda = l1_lambda
+        self.is_cubed = is_cubed
 
     def _update_learning_rate(self, param_groups, decay):
         for g in param_groups:
@@ -107,7 +204,9 @@ class BottleneckTrainer:
         os.makedirs(run_name, exist_ok=True)
 
         for epoch in range(num_epochs):
-            for net, opt, net_hist in zip(self.nets, self.opts, self.hist):
+            for net, opt, net_hist, training_method in zip(
+                self.nets, self.opts, self.hist, self.training_methods
+            ):
                 net.to(self.device)
                 bs_mul = net_hist["bs_mul"]
                 total_steps = net_hist["total_steps"]
@@ -157,13 +256,28 @@ class BottleneckTrainer:
                     ).to(self.device)
                     cbl_logits, logits = net(**inputs)
 
-                    if self.training_method == "gumbel":
-                        cbl_loss = self.criterion_gumbel(cbl_logits)
-                    elif self.training_method == "contrastive":
-                        cbl_loss = self.criterion_cbl(cbl_logits)
-                    elif self.training_method == "l1":
+                    ########
+                    # cbl_mean = torch.mean(cbl_logits)#, dim=0, keepdim=True)
+                    # cbl_std = torch.std(cbl_logits)#, dim=0, keepdim=True)
+                    # cbl_logits = (cbl_logits - cbl_mean) / cbl_std
+                    ########
+
+                    if training_method == "gumbel":
+                        cbl_loss = self.criterion_gumbel(
+                            cbl_logits, tau=self.gumbel_tau, hard=self.gumbel_hard
+                        )
+                    elif training_method == "contrastive":
+                        cbl_loss = self.criterion_contrastive(cbl_logits)
+                    elif training_method == "l1":
                         cbl_loss = (
-                            self.criterion_l1(net) / cbl_logits.squeeze().shape[1]
+                            self.criterion_l1(net, l1_lambda=self.l1_lambda)
+                            / cbl_logits.squeeze().shape[1]
+                        )
+                    elif training_method == "similarity":
+                        cbl_loss = -self.criterion_similarity(
+                            net.backbone(**inputs).logits_per_image,
+                            cbl_logits,
+                            self.is_cubed,
                         )
 
                     cbl_loss.backward(retain_graph=True)
@@ -212,7 +326,7 @@ class BottleneckTrainer:
                             val_top_1_precisions,
                             val_top_1_recalls,
                             val_top_1_f1scores,
-                        ) = self._evaluate(net, self.val_loader)
+                        ) = self._evaluate(net, self.val_loader, training_method)
 
                         net_hist["val_loss"].append(np.mean(val_ce_losses))
                         net_hist["val_cbl_loss"].append(np.mean(val_cbl_losses))
@@ -241,7 +355,7 @@ class BottleneckTrainer:
 
         print("Finished Training")
 
-    def save_checkpoint(self, epoch, net, optimizer_cbl, optimizer_head, net_hits):
+    def save_checkpoint(self, epoch, net, optimizer_cbl, optimizer_head, net_hist):
         state_dict = {
             "epoch": epoch,
             str(net_hist["val_acc_top_1"][-1])[:5]
@@ -281,7 +395,7 @@ class BottleneckTrainer:
         return res
 
     @torch.no_grad()
-    def _evaluate(self, net, loader):
+    def _evaluate(self, net, loader, training_method):
         cbl_losses, ce_losses = [], []
         top_1_accs, top_5_accs = [], []
         top_1_precisions, top_1_recalls = [], []
@@ -296,12 +410,29 @@ class BottleneckTrainer:
                 )
                 cbl_logits, logits = net(**inputs)
 
-                if self.training_method == "gumbel":
-                    cbl_loss = self.criterion_gumbel(cbl_logits)
-                elif self.training_method == "contrastive":
-                    cbl_loss = self.criterion_cbl(cbl_logits)
-                elif self.training_method == "l1":
-                    cbl_loss = self.criterion_l1(net) / cbl_logits.squeeze().shape[1]
+                ########
+                # cbl_mean = torch.mean(cbl_logits)#, dim=0, keepdim=True)
+                # cbl_std = torch.std(cbl_logits)#, dim=0, keepdim=True)
+                # cbl_logits = (cbl_logits - cbl_mean) / cbl_std
+                ########
+
+                if training_method == "gumbel":
+                    cbl_loss = self.criterion_gumbel(
+                        cbl_logits, tau=self.gumbel_tau, hard=self.gumbel_hard
+                    )
+                elif training_method == "contrastive":
+                    cbl_loss = self.criterion_contrastive(cbl_logits)
+                elif training_method == "l1":
+                    cbl_loss = (
+                        self.criterion_l1(net, l1_lambda=self.l1_lambda)
+                        / cbl_logits.squeeze().shape[1]
+                    )
+                elif training_method == "similarity":
+                    cbl_loss = -self.criterion_similarity(
+                        net.backbone(**inputs).logits_per_image,
+                        cbl_logits,
+                        self.is_cubed,
+                    )
 
                 cbl_losses.append(cbl_loss.detach().cpu().item())
 
@@ -349,7 +480,9 @@ class BottleneckTrainer:
             print("No test loader is provided!", "\n")
         else:
             print("Begin Testing")
-            for net, opt, net_hist in tqdm(zip(self.nets, self.opts, self.hist)):
+            for net, opt, net_hist, training_method in tqdm(
+                zip(self.nets, self.opts, self.hist, self.training_methods)
+            ):
                 net.to(self.device)
                 net.eval()
                 (
@@ -360,7 +493,7 @@ class BottleneckTrainer:
                     test_top_1_precisions,
                     test_top_1_recalls,
                     test_top_1_f1scores,
-                ) = self._evaluate(net, self.test_loader)
+                ) = self._evaluate(net, self.test_loader, training_method)
 
                 net_hist["test_acc_top_1"].append(np.mean(test_top_1_accs))
                 net_hist["test_acc_top_5"].append(np.mean(test_top_5_accs))
@@ -458,6 +591,10 @@ class BottleneckTrainer:
                 )
 
             plt.draw()
+
+        if net_hist["epochs_x"] == self.num_epochs - 1:
+            savepath = os.path.join(self.run_name, "training_plots.png")
+            fig.savefig(savepath, dpi=300)
 
         frames = len(grouped_hist) * 3
         anim = animation.FuncAnimation(

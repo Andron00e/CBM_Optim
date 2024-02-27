@@ -7,28 +7,47 @@ import matplotlib.pyplot as plt
 import torch.nn.functional as F
 
 
-class SparseCBLmodel_for_logits(nn.Module):
+class BaseCBModel(nn.Module):
     """
-    Basic architecture: CLIP model + two layers: CBL and FC (head)
+    Basic architecture: backbone model + two layers: CBL and FC (head)
+    Backbone model must be implemented with correct .logits_per_image method
     """
 
     def __init__(
         self,
         num_concepts: int,
         num_classes: int,
-        model_name: str = "openai/clip-vit-base-patch32",
+        backbone_name: str = "openai/clip-vit-base-patch32",
+        train_backbone: bool = False,
     ):
         super().__init__()
-        self.clip = transformers.CLIPModel.from_pretrained(model_name)
-        self.processor = transformers.CLIPProcessor.from_pretrained(model_name)
-        for param in self.clip.parameters():
-            param.requires_grad = False
+        if backbone_name == Constants.altclip_link:
+            self.backbone = transformers.AltCLIPModel.from_pretrained(backbone_name)
+            self.processor = transformers.AltCLIPProcessor.from_pretrained(
+                backbone_name
+            )
+        elif backbone_name == Constants.align_link:
+            self.backbone = transformers.AlignModel.from_pretrained(backbone_name)
+            self.processor = transformers.AlignProcessor.from_pretrained(backbone_name)
+        else:
+            self.backbone = transformers.CLIPModel.from_pretrained(backbone_name)
+            self.processor = transformers.CLIPProcessor.from_pretrained(backbone_name)
+        for param in self.backbone.parameters():
+            param.requires_grad = train_backbone
         self.cbl = nn.Linear(num_concepts, num_concepts, bias=False)
         self.head = nn.Linear(num_concepts, num_classes, bias=False)
 
     def forward(self, **batch):
-        cbl_out = self.cbl(self.clip(**batch).logits_per_image)
+        cbl_out = self.cbl(self.backbone(**batch).logits_per_image)
         return cbl_out, self.head(cbl_out)
+
+
+class BaseCBModelWithLoRA(nn.Module):
+    pass
+
+
+class BaseCBModelForSegmentation(nn.Module):
+    pass
 
 
 def contrastive_loss(logits, dim: int):
@@ -39,7 +58,7 @@ def contrastive_loss(logits, dim: int):
     return -neg_ce.mean()
 
 
-def criterion_cbl(similarity: torch.Tensor) -> torch.Tensor:
+def criterion_contrastive(similarity: torch.Tensor) -> torch.Tensor:
     """
     Args:
         similarity: is equal to logits_per_image
@@ -49,21 +68,23 @@ def criterion_cbl(similarity: torch.Tensor) -> torch.Tensor:
     return (caption_loss + image_loss) / 2.0
 
 
-def gumbel_contrastive_loss(logits, hard: bool = False, dim: int = 0):
+def gumbel_contrastive_loss(logits, tau: float = 1.0, hard: bool = False, dim: int = 0):
     """
     Simple contrastive loss based on Gumbel-Softmax distribution
     """
-    gumbel_softmax_samples = F.gumbel_softmax(logits, tau=1.0, dim=dim, hard=hard)
+    gumbel_softmax_samples = F.gumbel_softmax(logits, tau=tau, dim=dim, hard=hard)
     neg_ce = -torch.log(gumbel_softmax_samples)
     return neg_ce.mean()
 
 
-def criterion_gumbel(similarity: torch.Tensor, hard: bool = False) -> torch.Tensor:
+def criterion_gumbel(
+    similarity: torch.Tensor, tau: float = 1.0, hard: bool = False
+) -> torch.Tensor:
     """
     Self-supervised contrastive loss for CBL training
     """
-    first_loss = gumbel_contrastive_loss(similarity, hard=hard, dim=0)
-    second_loss = gumbel_contrastive_loss(similarity, hard=hard, dim=1)
+    first_loss = gumbel_contrastive_loss(similarity, tau=tau, hard=hard, dim=0)
+    second_loss = gumbel_contrastive_loss(similarity, tau=tau, hard=hard, dim=1)
     return (first_loss + second_loss) / 2.0
 
 
@@ -77,6 +98,29 @@ def criterion_l1(model, l1_lambda=1e-3):
         l1_loss += torch.norm(param, p=1)
 
     return l1_loss * l1_lambda
+
+
+def criterion_similarity(
+    logits_per_image: torch.Tensor, cbl_logits: torch.Tensor, is_cubed: bool = False
+) -> torch.Tensor:
+    """
+    Implementation of cosine similarity loss between .logits_per_image and outputs of CBL layer
+    CLIP-like models normalize its logits_per_image outputs, in this case, only the normalization of
+    CBL layer outputs is necessary. But we are trying to normalize both inputs.
+    """
+    logits_per_image = logits_per_image - torch.mean(
+        logits_per_image, dim=0, keepdim=True
+    )
+    cbl_logits = cbl_logits - torch.mean(cbl_logits, dim=0, keepdim=True)
+    if is_cubed == True:
+        logits_per_image = logits_per_image**3
+        cbl_logits = cbl_logits**3
+    logits_per_image = logits_per_image / torch.norm(
+        logits_per_image, p=2, dim=0, keepdim=True
+    )
+    cbl_logits = cbl_logits / torch.norm(cbl_logits, p=2, dim=0, keepdim=True)
+    similarities = torch.sum(cbl_logits * logits_per_image, dim=0)
+    return torch.mean(similarities)
 
 
 def draw_bottleneck(

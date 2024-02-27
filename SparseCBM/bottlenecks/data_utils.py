@@ -27,10 +27,13 @@ def remove_prefixes(strings):
 
 
 def preprocess_loader(
-    loader, concepts: list, clip_name: str = "openai/clip-vit-base-patch32"
+    loader, concepts: list, backbone_name: str = "openai/clip-vit-base-patch32"
 ):
     preprocessed_batches = []
-    processor = transformers.CLIPProcessor.from_pretrained(clip_name)
+    if backbone_name == Constants.altclip_link:
+        processor = transformers.AltCLIPProcessor.from_pretrained(backbone_name)
+    else:
+        processor = transformers.CLIPProcessor.from_pretrained(backbone_name)
     for batch in tqdm(loader):
         preprocessed_batch = preprocess_batch(batch, processor, concepts)
         preprocessed_batches.append(preprocessed_batch)
@@ -52,7 +55,7 @@ def prepared_dataloaders(
     test_size: int = 0.2,
     prep_loaders="all",
     batch_size: int = 32,
-    clip_model: str = "openai/clip-vit-base-patch32",
+    backbone_name: str = "openai/clip-vit-base-patch32",
 ):
     dataset = load_dataset(hf_link)
     dataset = dataset["train"].train_test_split(test_size=0.2)
@@ -89,13 +92,13 @@ def prepared_dataloaders(
 
     if prep_loaders == "all":
         train_loader_preprocessed = preprocess_loader(
-            train_loader, concepts, clip_model=clip_model
+            train_loader, concepts, backbone_name=backbone_name
         )
         val_loader_preprocessed = preprocess_loader(
-            val_loader, concepts, clip_model=clip_model
+            val_loader, concepts, backbone_name=backbone_name
         )
         test_loader_preprocessed = preprocess_loader(
-            test_loader, concepts, clip_model=clip_model
+            test_loader, concepts, backbone_name=backbone_name
         )
         return (
             train_loader_preprocessed,
@@ -104,16 +107,16 @@ def prepared_dataloaders(
         )
     elif prep_loaders == "train":
         train_loader_preprocessed = preprocess_loader(
-            train_loader, concepts, clip_model=clip_model
+            train_loader, concepts, backbone_name=backbone_name
         )
         return train_loader_preprocessed
     elif prep_loaders == "val":
         val_loader_preprocessed = preprocess_loader(
-            val_loader, concepts, clip_model=clip_model
+            val_loader, concepts, backbone_name=backbone_name
         )
         return val_loader_preprocessed
     elif prep_loaders == "test":
         test_loader_preprocessed = preprocess_loader(
-            test_loader, concepts, clip_model=clip_model
+            test_loader, concepts, backbone_name=backbone_name
         )
         return test_loader_preprocessed
