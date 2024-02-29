@@ -1,6 +1,7 @@
 import os
 import sys
 import math
+import peft
 import torch
 import random
 import sklearn
@@ -61,5 +62,16 @@ def set_device(device_no: int):
     else:
         print("No GPU available, using the CPU instead.")
         device = torch.device("cpu")
-
     return device
+
+
+def print_trainable_parameters(model):
+    trainable_params = 0
+    all_param = 0
+    for _, param in model.named_parameters():
+        all_param += param.numel()
+        if param.requires_grad:
+            trainable_params += param.numel()
+    print(
+        f"trainable params: {trainable_params} || all params: {all_param} || trainable%: {100 * trainable_params / all_param:.2f}"
+    )

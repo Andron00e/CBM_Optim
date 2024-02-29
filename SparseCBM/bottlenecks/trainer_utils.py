@@ -1,6 +1,8 @@
 # draw norm hists and compute norm diffs functions to be released
 # make tau in GumbelSoftmaxContrastiveLoss trainable
 # check is savefig works correctly
+# fix problem with more than one lora net_types
+# think about lora_ctn
 # add functions that plot metrics and losses after training
 # add functions that draw an interpretability bars with conf matrices
 
@@ -9,7 +11,6 @@ import time
 import warnings
 from graph_plot_tools import *
 from cbm import *
-from cbm import BaseCBModel
 from utils import *
 from configs import *
 from evaluate import load
@@ -64,6 +65,7 @@ class CBMConfig:
         num_concepts: int,
         num_classes: int,
         run_name: str,
+        net_types: list,
         backbones: list,
         displayed_names: list,
         training_methods: list,
@@ -71,11 +73,13 @@ class CBMConfig:
         lrs: list,
         cbl_lrs: list,
         train_backbones: list,
+        lora_connections: list,
     ):
         self.num_nets = num_nets
         self.num_concepts = num_concepts
         self.num_classes = num_classes
         self.run_name = run_name
+        self.net_types = net_types
         self.backbones = backbones
         self.displayed_names = displayed_names
         self.training_methods = training_methods
@@ -83,9 +87,11 @@ class CBMConfig:
         self.lrs = lrs
         self.cbl_lrs = cbl_lrs
         self.train_backbones = train_backbones
+        self.lora_connections = lora_connections
         self.bs_muls = [1] * self.num_nets
         assert (
             self.num_nets
+            == len(self.net_types)
             == len(self.backbones)
             == len(self.training_methods)
             == len(self.optimizers)
@@ -94,6 +100,9 @@ class CBMConfig:
             == len(self.train_backbones)
             == len(self.bs_muls)
         ), "These lists must be of the same length."
+        assert len(self.lora_connections) == len(
+            [n for n in self.net_types if n == "lora"]
+        ), "LoRA connections must match the number of models with LoRA."
         self.optimizers_dict = {
             "Adam": torch.optim.Adam,
             "AdamW": torch.optim.AdamW,
@@ -103,34 +112,78 @@ class CBMConfig:
     def _create_models_and_optimizers(self):
         torch.cuda.empty_cache()
         nets, opts = [], []
+        lora_cnt = 0
         for _ in range(self.num_nets):
-            for backbone_name, train_backbone, opt_name, lr, cbl_lr in zip(
+            for net_type, backbone_name, train_backbone, opt_name, lr, cbl_lr in zip(
+                self.net_types,
                 self.backbones,
                 self.train_backbones,
                 self.optimizers,
                 self.lrs,
                 self.cbl_lrs,
             ):
-                nets.append(
-                    BaseCBModel(
-                        num_concepts=self.num_concepts,
-                        num_classes=self.num_classes,
-                        backbone_name=backbone_name,
-                        train_backbone=train_backbone,
+                if net_type == "base":
+                    nets.append(
+                        BaseCBModel(
+                            num_concepts=self.num_concepts,
+                            num_classes=self.num_classes,
+                            backbone_name=backbone_name,
+                            train_backbone=train_backbone,
+                        )
                     )
-                )
-                nets[-1].zero_grad()
-                nets[-1].train()
-                opts.append(
-                    (
-                        self.optimizers_dict[opt_name](
-                            nets[-1].cbl.parameters(), lr=cbl_lr
-                        ),
-                        self.optimizers_dict[opt_name](
-                            nets[-1].head.parameters(), lr=lr
-                        ),
+                    nets[-1].zero_grad()
+                    nets[-1].train()
+                    opts.append(
+                        (
+                            self.optimizers_dict[opt_name](
+                                nets[-1].cbl.parameters(), lr=cbl_lr
+                            ),
+                            self.optimizers_dict[opt_name](
+                                nets[-1].head.parameters(), lr=lr
+                            ),
+                        )
                     )
-                )
+                elif net_type == "lora":
+                    nets.append(
+                        BaseCBModelWithLora(
+                            num_concepts=self.num_concepts,
+                            num_classes=self.num_classes,
+                            backbone_name=backbone_name,
+                            train_backbone=train_backbone,
+                            connect_to=self.lora_connections[lora_cnt],
+                        )
+                    )
+                    nets[-1].zero_grad()
+                    nets[-1].train()
+                    if self.lora_connections[lora_cnt] == "last":
+                        opts.append(
+                            (
+                                self.optimizers_dict[opt_name](
+                                    nets[-1].cbl.parameters(),
+                                    lr=cbl_lr,
+                                    # [{"params": nets[-1].backbone.visual_projection.parameters(),
+                                    # "params": nets[-1].cbl.parameters()}], lr=cbl_lr
+                                ),
+                                self.optimizers_dict[opt_name](
+                                    # nets[-1].head.parameters(), lr=lr
+                                    [
+                                        {
+                                            "params": nets[
+                                                -1
+                                            ].backbone.visual_projection.parameters(),
+                                            "params": nets[-1].head.parameters(),
+                                        }
+                                    ],
+                                    lr=lr,
+                                ),
+                            )
+                        )
+                    # lora count fix
+                    # print(lora_cnt, len(self.lora_connections))
+                    # lora_cnt += 1
+                    # if lora_cnt != len(self.lora_connections):
+                    #    lora_cnt += 1
+                    # print(lora_cnt, len(self.lora_connections))
                 # backbone won't be trained yet, because we connect optimizer only to the head.parameters()
         return nets, opts
 
@@ -179,7 +232,7 @@ class BottleneckTrainer:
         self.f1_metric = load("f1")
         self.lr_decay = lr_decay
         self.run_name = run_name
-        self.num_epochs = 10
+        self.num_epochs = num_epochs
         self.batch_mul_step_count = batch_mul_step_count
         self.norm_diffs_step_count = norm_diffs_step_count
         self.val_step_count = val_step_count
@@ -262,6 +315,7 @@ class BottleneckTrainer:
                     # cbl_logits = (cbl_logits - cbl_mean) / cbl_std
                     ########
 
+                    cbl_loss = None  # test this line
                     if training_method == "gumbel":
                         cbl_loss = self.criterion_gumbel(
                             cbl_logits, tau=self.gumbel_tau, hard=self.gumbel_hard
