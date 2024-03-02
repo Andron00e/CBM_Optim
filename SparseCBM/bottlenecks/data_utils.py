@@ -1,8 +1,9 @@
 import sys
-from configs import *
+
 import transformers
-from datasets import load_dataset
-from datasets import DatasetDict
+from datasets import DatasetDict, load_dataset
+
+from configs import *
 
 
 def collate_fn(batch):

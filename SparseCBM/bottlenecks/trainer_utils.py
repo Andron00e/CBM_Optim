@@ -9,13 +9,15 @@
 import os
 import time
 import warnings
-from graph_plot_tools import *
-from cbm import *
-from utils import *
-from configs import *
+
 from evaluate import load
 from IPython import display
 from matplotlib import animation
+
+from cbm import *
+from configs import *
+from graph_plot_tools import *
+from utils import *
 
 
 def init_history(run_name, nets, opts, displayed_names, bs_muls):

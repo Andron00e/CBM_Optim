@@ -1,9 +1,10 @@
-import matplotlib.pyplot as plt
-from matplotlib.gridspec import GridSpec
 import bisect
-import scipy
-from scipy import stats
+
+import matplotlib.pyplot as plt
 import numpy as np
+import scipy
+from matplotlib.gridspec import GridSpec
+from scipy import stats
 
 
 def accuracy(output, target, topk=(1,)):

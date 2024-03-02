@@ -1,13 +1,15 @@
-from configs import *
+import bokeh.models as bm
+import bokeh.plotting as pl
 import clip
 import open_clip
+from bokeh.io import output_notebook
 from open_clip import tokenizer
 from PIL import Image
-from sklearn.manifold import TSNE
-from bokeh.io import output_notebook
 from sklearn.decomposition import PCA
-import bokeh.models as bm, bokeh.plotting as pl
+from sklearn.manifold import TSNE
 from sklearn.preprocessing import StandardScaler
+
+from configs import *
 
 
 def get_image_features(
