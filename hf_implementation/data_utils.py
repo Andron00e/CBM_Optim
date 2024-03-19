@@ -1,8 +1,10 @@
 import sys
-from configs import *
+
 import transformers
-from datasets import load_dataset
-from datasets import DatasetDict
+from tqdm.auto import tqdm
+from datasets import DatasetDict, load_dataset
+
+from configs import *
 
 
 def collate_fn(batch):
@@ -32,12 +34,8 @@ def preprocess_loader(
     preprocessed_batches = []
     if backbone_name == Constants.altclip_link:
         processor = transformers.AltCLIPProcessor.from_pretrained(backbone_name)
-    elif backbone_name == Constants.align_link:
-        processor = transformers.AlignProcessor.from_pretrained(backbone_name)
-    elif backbone_name in [Constants.siglip_so_link, Constants.siglip_base_link, Constants.siglip_large_link, Constants.siglip_large_256_link]:
-        processor = transformers.AutoProcessor.from_pretrained(backbone_name)
     else:
-        processor = transformers.CLIPProcessor.from_pretrained(backbone_name) 
+        processor = transformers.CLIPProcessor.from_pretrained(backbone_name)
     for batch in tqdm(loader):
         preprocessed_batch = preprocess_batch(batch, processor, concepts)
         preprocessed_batches.append(preprocessed_batch)
@@ -62,7 +60,7 @@ def prepared_dataloaders(
     backbone_name: str = "openai/clip-vit-base-patch32",
 ):
     dataset = load_dataset(hf_link)
-    dataset = dataset["train"].train_test_split(test_size=test_size)
+    dataset = dataset["train"].train_test_split(test_size=0.2)
     val_test = dataset["test"].train_test_split(test_size=0.5)
     dataset = DatasetDict(
         {
