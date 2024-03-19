@@ -89,7 +89,7 @@ class BaseCBModelWithLora(torch.nn.Module):
         else:
             self.backbone = transformers.CLIPModel.from_pretrained(backbone_name)
             self.processor = transformers.CLIPProcessor.from_pretrained(backbone_name)
-        for param in backbone.parameters():
+        for param in self.backbone.parameters():
             param.requires_grad = train_backbone
         self.num_loras = num_loras
         self.lora_rank = lora_rank
