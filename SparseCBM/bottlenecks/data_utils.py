@@ -34,10 +34,15 @@ def preprocess_loader(
         processor = transformers.AltCLIPProcessor.from_pretrained(backbone_name)
     elif backbone_name == Constants.align_link:
         processor = transformers.AlignProcessor.from_pretrained(backbone_name)
-    elif backbone_name in [Constants.siglip_so_link, Constants.siglip_base_link, Constants.siglip_large_link, Constants.siglip_large_256_link]:
+    elif backbone_name in [
+        Constants.siglip_so_link,
+        Constants.siglip_base_link,
+        Constants.siglip_large_link,
+        Constants.siglip_large_256_link,
+    ]:
         processor = transformers.AutoProcessor.from_pretrained(backbone_name)
     else:
-        processor = transformers.CLIPProcessor.from_pretrained(backbone_name) 
+        processor = transformers.CLIPProcessor.from_pretrained(backbone_name)
     for batch in tqdm(loader):
         preprocessed_batch = preprocess_batch(batch, processor, concepts)
         preprocessed_batches.append(preprocessed_batch)
