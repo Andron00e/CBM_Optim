@@ -1,23 +1,20 @@
 # draw norm hists and compute norm diffs functions to be released
 # make tau in GumbelSoftmaxContrastiveLoss trainable
 # check is savefig works correctly
-# fix problem with more than one lora net_types
-# think about lora_ctn
-# add functions that plot metrics and losses after training
 # add functions that draw an interpretability bars with conf matrices
 
 import os
 import time
+import torch
+import wandb
 import warnings
-
+from graph_plot_tools import *
+from cbm import *
+from utils import *
+from configs import *
 from evaluate import load
 from IPython import display
 from matplotlib import animation
-
-from cbm import *
-from configs import *
-from graph_plot_tools import *
-from utils import *
 
 
 def init_history(run_name, nets, opts, displayed_names, bs_muls):
@@ -75,7 +72,7 @@ class CBMConfig:
         lrs: list,
         cbl_lrs: list,
         train_backbones: list,
-        lora_connections: list,
+        lora_connections: list = [],
     ):
         self.num_nets = num_nets
         self.num_concepts = num_concepts
@@ -141,7 +138,18 @@ class CBMConfig:
                                 nets[-1].cbl.parameters(), lr=cbl_lr
                             ),
                             self.optimizers_dict[opt_name](
-                                nets[-1].head.parameters(), lr=lr
+                                [
+                                    {
+                                        "head": nets[-1].head.parameters(),
+                                        "params": [
+                                            p
+                                            for p in nets[-1].parameters()
+                                            if p.requires_grad
+                                        ],
+                                    }
+                                ],
+                                lr=lr,
+                                # nets[-1].head.parameters(), lr=lr
                             ),
                         )
                     )
@@ -214,6 +222,7 @@ class BottleneckTrainer:
         gumbel_tau=1.0,
         l1_lambda=1e-3,
         is_cubed=False,
+        report_to=Optional[str],
     ):
         nets, opts, hist, run_name, training_methods = config.unpack()
         self.nets = nets
@@ -243,6 +252,7 @@ class BottleneckTrainer:
         self.gumbel_tau = gumbel_tau
         self.l1_lambda = l1_lambda
         self.is_cubed = is_cubed
+        self.report_to = report_to
 
     def _update_learning_rate(self, param_groups, decay):
         for g in param_groups:
@@ -257,6 +267,9 @@ class BottleneckTrainer:
 
         run_name = self.run_name
         os.makedirs(run_name, exist_ok=True)
+
+        if self.report_to == "wandb":
+            run = wandb.init(name=self.run_name, resume=False)
 
         for epoch in range(num_epochs):
             for net, opt, net_hist, training_method in zip(
@@ -405,10 +418,28 @@ class BottleneckTrainer:
 
                     net_hist["total_steps"] = total_steps
 
-                self.save_checkpoint(
-                    epoch, net, optimizer_cbl, optimizer_head, net_hist
+                if (
+                    net_hist["total_steps"] - net_hist["prev_val_eval_step"]
+                ) > val_step_count and net_hist["batch_end"]:
+                    self.save_checkpoint(
+                        epoch, net, optimizer_cbl, optimizer_head, net_hist
+                    )
+            if self.report_to == "wandb":
+                run.log(
+                    {
+                        "train loss": net_hist["train_loss"],
+                        "train cbl loss": net_hist["train_cbl_loss"],
+                        "train accuracy top 1": net_hist["train_acc_top_1"],
+                        "train accuracy top 5": net_hist["train_acc_top_5"],
+                        "val loss": net_hist["val_loss"],
+                        "val cbl loss": net_hist["val_cbl_loss"],
+                        "val accuracy top 1": net_hist["val_acc_top_1"],
+                        "val accuracy top 5": net_hist["val_acc_top_5"],
+                        "val precision": net_hist["val_precision"],
+                        "val recall": net_hist["val_recall"],
+                        "val f1": net_hist["val_f1"],
+                    }
                 )
-
         print("Finished Training")
 
     def save_checkpoint(self, epoch, net, optimizer_cbl, optimizer_head, net_hist):

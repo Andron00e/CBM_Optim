@@ -1,29 +1,29 @@
-import math
 import os
-import random
 import sys
-
+import math
+import torch
+import random
+import sklearn
+import requests
 import datasets
-import matplotlib.pyplot as plt
+import torchvision
+import transformers
 import numpy as np
 import pandas as pd
-import peft
-import requests
 import seaborn as sns
-import sklearn
-import torch
-import torch.nn as nn
-import torch.nn.functional as F
-import torchvision
-import torchvision.transforms as transforms
-import transformers
-from datasets import load_metric
 from PIL import Image
-from torch.utils.data import DataLoader, Dataset
+import torch.nn as nn
 from tqdm.auto import tqdm
+import torch.nn.functional as F
+import matplotlib.pyplot as plt
+from datasets import load_metric
+import torchvision.transforms as transforms
+from IPython.display import display, Markdown
+from torch.utils.data import Dataset, DataLoader
 
 
 class Constants:
+
     seed = 42
     batch_size = 32
     lr = 1e-3
@@ -63,6 +63,7 @@ def set_device(device_no: int):
     else:
         print("No GPU available, using the CPU instead.")
         device = torch.device("cpu")
+
     return device
 
 
@@ -74,5 +75,9 @@ def print_trainable_parameters(model):
         if param.requires_grad:
             trainable_params += param.numel()
     print(
-        f"trainable params: {trainable_params} || all params: {all_param} || trainable%: {100 * trainable_params / all_param:.2f}"
+        f"trainable params: {trainable_params:,} || all params: {all_param:,} || trainable%: {100 * trainable_params / all_param:.2f}"
     )
+
+
+def print_centered_text(text):
+    display(Markdown(f"<center>{text}</center>"))

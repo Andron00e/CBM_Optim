@@ -1,16 +1,13 @@
-import matplotlib.pyplot as plt
-import pandas as pd
-import seaborn as sns
 import torch
-import torch.nn as nn
-import torch.nn.functional as F
 import transformers
-from peft import LoraConfig, get_peft_model
-
+import torch.nn as nn
+import seaborn as sns
 from configs import *
+import matplotlib.pyplot as plt
+import torch.nn.functional as F
 
 
-class BaseCBModel(torch.nn.Module):
+class BaseCBModel(nn.Module):
     """
     Basic architecture: backbone model + two layers: CBL and FC (head)
     Backbone model must be implemented with correct .logits_per_image method
@@ -32,6 +29,14 @@ class BaseCBModel(torch.nn.Module):
         elif backbone_name == Constants.align_link:
             self.backbone = transformers.AlignModel.from_pretrained(backbone_name)
             self.processor = transformers.AlignProcessor.from_pretrained(backbone_name)
+        elif backbone_name in [
+            Constants.siglip_so_link,
+            Constants.siglip_base_link,
+            Constants.siglip_large_link,
+            Constants.siglip_large_256_link,
+        ]:
+            self.backbone = transformers.AutoModel.from_pretrained(backbone_name)
+            self.processor = transformers.AutoProcessor.from_pretrained(backbone_name)
         else:
             self.backbone = transformers.CLIPModel.from_pretrained(backbone_name)
             self.processor = transformers.CLIPProcessor.from_pretrained(backbone_name)
@@ -46,6 +51,12 @@ class BaseCBModel(torch.nn.Module):
 
 
 class BaseCBModelWithLora(torch.nn.Module):
+    """
+    Base class for introducing CBM with LoRA adapters.
+    Args:
+        connect_to: can be either vit self attn, text self attn or last linear layer of a backbone model, i.e., projection
+    """
+
     def __init__(
         self,
         num_concepts: int,
@@ -67,10 +78,18 @@ class BaseCBModelWithLora(torch.nn.Module):
         elif backbone_name == Constants.align_link:
             backbone = transformers.AlignModel.from_pretrained(backbone_name)
             self.processor = transformers.AlignProcessor.from_pretrained(backbone_name)
+        elif backbone_name in [
+            Constants.siglip_so_link,
+            Constants.siglip_base_link,
+            Constants.siglip_large_link,
+            Constants.siglip_large_256_link,
+        ]:
+            self.backbone = transformers.AutoModel.from_pretrained(backbone_name)
+            self.processor = transformers.AutoProcessor.from_pretrained(backbone_name)
         else:
-            backbone = transformers.CLIPModel.from_pretrained(backbone_name)
+            self.backbone = transformers.CLIPModel.from_pretrained(backbone_name)
             self.processor = transformers.CLIPProcessor.from_pretrained(backbone_name)
-        for param in backbone.parameters():
+        for param in self.backbone.parameters():
             param.requires_grad = train_backbone
         self.num_loras = num_loras
         self.lora_rank = lora_rank
@@ -112,7 +131,7 @@ class BaseCBModelWithLora(torch.nn.Module):
         return cbl_out, self.head(cbl_out)
 
 
-class BaseCBModelForSegmentation(torch.nn.Module):
+class BaseCBModelForSegmentation(nn.Module):
     pass
 
 
@@ -197,14 +216,18 @@ def draw_bottleneck(
     """
     top_values, top_indices = torch.topk(cbl_logits, k)
 
-    if draw_probs:
+    if draw_probs == True:
         top_values = torch.nn.functional.softmax(top_values, dim=-1)
+
+    import pandas as pd
+
     data = pd.DataFrame(
         {
             "Concepts": [concepts[i] for i in top_indices.squeeze().tolist()],
             "Probability": top_values.squeeze().tolist(),
         }
     )
+
     plt.figure(figsize=(10, 6), dpi=300)
     sns.barplot(x="Probability", y="Concepts", data=data)
     plt.xlabel("Weight", fontsize=16)
