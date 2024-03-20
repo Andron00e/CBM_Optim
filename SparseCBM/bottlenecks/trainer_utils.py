@@ -19,9 +19,7 @@ from matplotlib import animation
 
 def init_history(run_name, nets, opts, displayed_names, bs_muls):
     hist = []
-    for net, optimizer, displayed_name, bs_mul in zip(
-        nets, opts, displayed_names, bs_muls
-    ):
+    for net, optimizer, displayed_name, bs_mul in zip(nets, opts, displayed_names, bs_muls):
         hist.append(
             {
                 "run_name": run_name,
@@ -54,7 +52,7 @@ def init_history(run_name, nets, opts, displayed_names, bs_muls):
                 "batch_end": True,
             }
         )
-    return hist
+    return hist 
 
 
 class CBMConfig:
@@ -138,18 +136,9 @@ class CBMConfig:
                                 nets[-1].cbl.parameters(), lr=cbl_lr
                             ),
                             self.optimizers_dict[opt_name](
-                                [
-                                    {
-                                        "head": nets[-1].head.parameters(),
-                                        "params": [
-                                            p
-                                            for p in nets[-1].parameters()
-                                            if p.requires_grad
-                                        ],
-                                    }
-                                ],
-                                lr=lr,
-                                # nets[-1].head.parameters(), lr=lr
+                                [{"head": nets[-1].head.parameters(),
+                                  "params": [p for p in nets[-1].backbone.parameters() if not p.name == "cbl"]}], lr=lr
+                                #nets[-1].head.parameters(), lr=lr
                             ),
                         )
                     )
@@ -169,31 +158,23 @@ class CBMConfig:
                         opts.append(
                             (
                                 self.optimizers_dict[opt_name](
-                                    nets[-1].cbl.parameters(),
-                                    lr=cbl_lr,
-                                    # [{"params": nets[-1].backbone.visual_projection.parameters(),
-                                    # "params": nets[-1].cbl.parameters()}], lr=cbl_lr
+                                    nets[-1].cbl.parameters(), lr=cbl_lr
+                                    #[{"params": nets[-1].backbone.visual_projection.parameters(),
+                                     #"params": nets[-1].cbl.parameters()}], lr=cbl_lr
                                 ),
                                 self.optimizers_dict[opt_name](
-                                    # nets[-1].head.parameters(), lr=lr
-                                    [
-                                        {
-                                            "params": nets[
-                                                -1
-                                            ].backbone.visual_projection.parameters(),
-                                            "params": nets[-1].head.parameters(),
-                                        }
-                                    ],
-                                    lr=lr,
+                                    #nets[-1].head.parameters(), lr=lr
+                                    [{"params": nets[-1].backbone.visual_projection.parameters(),
+                                     "params": nets[-1].head.parameters()}], lr=lr
                                 ),
                             )
                         )
-                    # lora count fix
-                    # print(lora_cnt, len(self.lora_connections))
-                    # lora_cnt += 1
-                    # if lora_cnt != len(self.lora_connections):
+                    #lora count fix
+                    #print(lora_cnt, len(self.lora_connections))
+                    #lora_cnt += 1
+                    #if lora_cnt != len(self.lora_connections):
                     #    lora_cnt += 1
-                    # print(lora_cnt, len(self.lora_connections))
+                    #print(lora_cnt, len(self.lora_connections))
                 # backbone won't be trained yet, because we connect optimizer only to the head.parameters()
         return nets, opts
 
@@ -417,29 +398,25 @@ class BottleneckTrainer:
                     total_steps += 1
 
                     net_hist["total_steps"] = total_steps
-
-                if (
-                    net_hist["total_steps"] - net_hist["prev_val_eval_step"]
-                ) > val_step_count and net_hist["batch_end"]:
+                 
+                if (net_hist["total_steps"] - net_hist["prev_val_eval_step"]) > val_step_count and net_hist["batch_end"]:
                     self.save_checkpoint(
                         epoch, net, optimizer_cbl, optimizer_head, net_hist
                     )
-            if self.report_to == "wandb":
-                run.log(
-                    {
-                        "train loss": net_hist["train_loss"],
-                        "train cbl loss": net_hist["train_cbl_loss"],
-                        "train accuracy top 1": net_hist["train_acc_top_1"],
-                        "train accuracy top 5": net_hist["train_acc_top_5"],
-                        "val loss": net_hist["val_loss"],
-                        "val cbl loss": net_hist["val_cbl_loss"],
-                        "val accuracy top 1": net_hist["val_acc_top_1"],
-                        "val accuracy top 5": net_hist["val_acc_top_5"],
-                        "val precision": net_hist["val_precision"],
-                        "val recall": net_hist["val_recall"],
-                        "val f1": net_hist["val_f1"],
-                    }
-                )
+            if self.report_to == "wandb": 
+                run.log({
+                    "train loss":  net_hist["train_loss"],
+                    "train cbl loss": net_hist["train_cbl_loss"],
+                    "train accuracy top 1": net_hist["train_acc_top_1"],
+                    "train accuracy top 5": net_hist["train_acc_top_5"],
+                    "val loss": net_hist["val_loss"],
+                    "val cbl loss": net_hist["val_cbl_loss"],
+                    "val accuracy top 1": net_hist["val_acc_top_1"],
+                    "val accuracy top 5": net_hist["val_acc_top_5"],
+                    "val precision": net_hist["val_precision"],
+                    "val recall": net_hist["val_recall"],
+                    "val f1": net_hist["val_f1"],
+                })
         print("Finished Training")
 
     def save_checkpoint(self, epoch, net, optimizer_cbl, optimizer_head, net_hist):
