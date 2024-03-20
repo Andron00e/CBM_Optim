@@ -13,6 +13,7 @@ import pandas as pd
 import seaborn as sns
 from PIL import Image
 import torch.nn as nn
+from typing import Optional
 from tqdm.auto import tqdm
 import torch.nn.functional as F
 import matplotlib.pyplot as plt
@@ -23,6 +24,7 @@ from torch.utils.data import Dataset, DataLoader
 
 
 class Constants:
+
 
     seed = 42
     batch_size = 32
@@ -57,7 +59,7 @@ def set_seed(seed):
 
 def set_device(device_no: int):
     if torch.cuda.is_available():
-        device = torch.device("cuda")
+        device = torch.device(f"cuda:{device_no}")
         print("There are %d GPU(s) available." % torch.cuda.device_count())
         print("We will use the GPU:", torch.cuda.get_device_name(device_no))
     else:
@@ -65,7 +67,6 @@ def set_device(device_no: int):
         device = torch.device("cpu")
 
     return device
-
 
 def print_trainable_parameters(model):
     trainable_params = 0
@@ -77,7 +78,6 @@ def print_trainable_parameters(model):
     print(
         f"trainable params: {trainable_params:,} || all params: {all_param:,} || trainable%: {100 * trainable_params / all_param:.2f}"
     )
-
 
 def print_centered_text(text):
     display(Markdown(f"<center>{text}</center>"))
