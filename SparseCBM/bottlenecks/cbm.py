@@ -26,7 +26,16 @@ class BaseCBModel(nn.Module):
         elif backbone_name == Constants.align_link:
             self.backbone = transformers.AlignModel.from_pretrained(backbone_name)
             self.processor = transformers.AlignProcessor.from_pretrained(backbone_name)
+<<<<<<< HEAD
         elif backbone_name in [Constants.siglip_so_link, Constants.siglip_base_link, Constants.siglip_large_link, Constants.siglip_large_256_link]:
+=======
+        elif backbone_name in [
+            Constants.siglip_so_link,
+            Constants.siglip_base_link,
+            Constants.siglip_large_link,
+            Constants.siglip_large_256_link,
+        ]:
+>>>>>>> 9ce96cf23066c1f27872d900e34fc0c6997844fb
             self.backbone = transformers.AutoModel.from_pretrained(backbone_name)
             self.processor = transformers.AutoProcessor.from_pretrained(backbone_name)
         else:
@@ -48,6 +57,10 @@ class BaseCBModelWithLora(torch.nn.Module):
     Args:
         connect_to: can be either vit self attn, text self attn or last linear layer of a backbone model, i.e., projection
     """
+<<<<<<< HEAD
+=======
+
+>>>>>>> 9ce96cf23066c1f27872d900e34fc0c6997844fb
     def __init__(
         self,
         num_concepts: int,
@@ -69,13 +82,23 @@ class BaseCBModelWithLora(torch.nn.Module):
         elif backbone_name == Constants.align_link:
             backbone = transformers.AlignModel.from_pretrained(backbone_name)
             self.processor = transformers.AlignProcessor.from_pretrained(backbone_name)
+<<<<<<< HEAD
         elif backbone_name in [Constants.siglip_so_link, Constants.siglip_base_link, Constants.siglip_large_link, Constants.siglip_large_256_link]:
             backbone = transformers.AutoModel.from_pretrained(backbone_name)
+=======
+        elif backbone_name in [
+            Constants.siglip_so_link,
+            Constants.siglip_base_link,
+            Constants.siglip_large_link,
+            Constants.siglip_large_256_link,
+        ]:
+            self.backbone = transformers.AutoModel.from_pretrained(backbone_name)
+>>>>>>> 9ce96cf23066c1f27872d900e34fc0c6997844fb
             self.processor = transformers.AutoProcessor.from_pretrained(backbone_name)
         else:
-            backbone = transformers.CLIPModel.from_pretrained(backbone_name)
+            self.backbone = transformers.CLIPModel.from_pretrained(backbone_name)
             self.processor = transformers.CLIPProcessor.from_pretrained(backbone_name)
-        for param in backbone.parameters():
+        for param in self.backbone.parameters():
             param.requires_grad = train_backbone
         self.num_loras = num_loras
         self.lora_rank = lora_rank
